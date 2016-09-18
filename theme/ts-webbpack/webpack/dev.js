@@ -2,10 +2,12 @@ var DashboardPlugin = require('webpack-dashboard/plugin');
 var HtmlPlugin = require('html-webpack-plugin');
 var StyleLintPlugin = require('stylelint-webpack-plugin');
 var autoprefixer = require('autoprefixer');
+var glob = require('glob');
 
 module.exports = {
   entry: {
-    index: [__dirname + '/../src/index.ts', 'babel-polyfill']
+    index: [__dirname + '/../src/index.ts', 'babel-polyfill'],
+    test: glob.sync(__dirname + '/../src/**/*.spec.ts')
   },
 
   output: {
@@ -28,6 +30,11 @@ module.exports = {
         loader: 'babel!ts'
       },
       {
+        test: /\.spec\.ts$/,
+        exclude: /node_modules/,
+        loader: 'mocha!babel!ts'
+      },
+      {
         test: /\.scss$/,
         exclude: /node_modules/,
         loader: 'style!css?sourceMap!postcss?sourceMap!sass?sourceMap'
@@ -46,5 +53,11 @@ module.exports = {
 
   postcss: function() {
     return [autoprefixer];
+  },
+
+  // workaround for growl module error
+  node: {
+    fs: "empty",
+    child_process: "empty"
   }
 }
