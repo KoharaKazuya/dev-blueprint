@@ -28,8 +28,8 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "webpack --config webpack/prod.js",
-    "start": "webpack-dashboard -- webpack-dev-server --config webpack/dev.js --inline",
-    "test": "webpack --config webpack/test.js"
+    "build": "NODE_ENV=production webpack --config webpack/prod.js",
+    "start": "NODE_ENV=development webpack-dashboard -- webpack-dev-server --config webpack/dev.js --inline",
+    "test": "NODE_ENV=test webpack --config webpack/test.js"
   }
 }
