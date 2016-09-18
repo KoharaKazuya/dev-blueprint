@@ -17,16 +17,19 @@ module.exports = {
     preLoaders: [
       {
         test: /\.ts$/,
+        exclude: /node_modules/,
         loader: 'tslint'
       }
     ],
     loaders: [
       {
         test: /\.ts$/,
+        exclude: /node_modules/,
         loader: 'babel!ts'
       },
       {
         test: /\.scss$/,
+        exclude: /node_modules/,
         loader: 'style!css?sourceMap!postcss?sourceMap!sass?sourceMap'
       }
     ]
