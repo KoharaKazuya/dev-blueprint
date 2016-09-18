@@ -1,0 +1,17 @@
+{
+  "name": "ts-webpack",
+  "version": "1.0.0",
+  "author": "Kohara Kazuya <reflect.results@gmail.com>",
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack-dev-server --config webpack/dev.js --inline",
+    "build": "webpack --config webpack/prod.js"
+  },
+  "devDependencies": {
+    "ts-loader": "^0.8.2",
+    "typescript": "^2.0.2",
+    "webpack": "^1.13.2",
+    "webpack-dev-server": "^1.16.0"
+  }
+}
