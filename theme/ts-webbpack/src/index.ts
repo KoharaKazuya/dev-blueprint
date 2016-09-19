@@ -1,5 +1,5 @@
 import "./index.scss";
 
-Promise.resolve(true).then(() => {
-  alert("ok");
-});
+export function id(value: any): any {
+  return value;
+}

@@ -13,6 +13,10 @@ module.exports = {
     path: __dirname + '/../dist'
   },
 
+  resolve: {
+    extensions: ["", ".webpack.js", ".web.js", ".js", ".ts"]
+  },
+
   module: {
     preLoaders: [
       {
