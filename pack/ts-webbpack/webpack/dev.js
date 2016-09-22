@@ -5,7 +5,7 @@ var autoprefixer = require('autoprefixer');
 
 module.exports = {
   entry: {
-    index: [__dirname + '/../src/index.ts', 'babel-polyfill']
+    index: ['babel-polyfill', __dirname + '/../src/index.ts']
   },
 
   output: {
