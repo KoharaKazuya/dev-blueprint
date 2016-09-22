@@ -33,8 +33,11 @@ module.exports = {
       },
       {
         test: /\.scss$/,
-        exclude: /node_modules/,
         loader: 'style!css!postcss!sass'
+      },
+      {
+        test: /\.(png|jpe?g|svg|ttf|eot|woff2?)$/,
+        loader: 'url?limit=10000'
       }
     ]
   },
