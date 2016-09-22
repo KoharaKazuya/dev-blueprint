@@ -50,5 +50,10 @@ module.exports = {
 
   postcss: function() {
     return [autoprefixer];
+  },
+
+  devServer: {
+    inline: true,
+    contentBase: __dirname + "/../dist"
   }
 }

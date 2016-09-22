@@ -42,7 +42,7 @@
   "private": true,
   "scripts": {
     "build": "NODE_ENV=production webpack --config webpack/prod.js",
-    "start": "NODE_ENV=development webpack-dashboard -- webpack-dev-server --config webpack/dev.js --inline",
+    "start": "NODE_ENV=development webpack-dashboard -- webpack-dev-server --config webpack/dev.js",
     "test": "NODE_ENV=test karma start --single-run",
     "test-watch": "NODE_ENV=test karma start"
   }
