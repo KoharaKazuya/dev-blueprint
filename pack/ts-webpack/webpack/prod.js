@@ -46,7 +46,9 @@ module.exports = {
     new webpack.optimize.UglifyJsPlugin({ compress: { warnings: false } }),
     new webpack.optimize.DedupePlugin(),
     new HtmlPlugin({ template: __dirname + '/../src/index.html' }),
-    new StyleLintPlugin({ failOnError: true })
+    new StyleLintPlugin({
+      failOnError: true
+    })
   ],
 
   postcss: function() {

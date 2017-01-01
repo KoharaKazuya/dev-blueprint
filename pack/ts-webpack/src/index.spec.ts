@@ -5,8 +5,8 @@ import * as index from "./index";
 
 describe("test", () => {
   it("should be ok", () => {
-    const a = 1;
-    const b = 2;
+    const a = index.id(1);
+    const b = index.id(2);
     assert(a === b);
   });
 
