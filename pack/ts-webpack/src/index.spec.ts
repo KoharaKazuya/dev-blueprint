@@ -1,5 +1,4 @@
-import "mocha";
-import * as assert from "power-assert";
+import "jasmine";
 
 import * as index from "./index";
 
@@ -7,12 +6,13 @@ describe("test", () => {
   it("should be ok", () => {
     const a = index.id(1);
     const b = index.id(2);
-    assert(a === b);
+    expect(a).toBe(1);
+    expect(b).toBe(2);
   });
 
   it("should be the same", () => {
     const prev = "prev";
     const tran = index.id(prev);
-    assert(tran === prev);
+    expect(tran).toBe(prev);
   });
 });

@@ -8,7 +8,7 @@ module.exports = function(config) {
 
 
     // frameworks to use
-    frameworks: ['mocha'],
+    frameworks: ['jasmine'],
 
 
     // list of files / patterns to load in the browser
@@ -25,7 +25,7 @@ module.exports = function(config) {
     },
 
 
-    webpack: require('./webpack/test'),
+    webpack: require('./webpack.config.js')({ env: 'test' }),
 
 
     webpackMiddleware: {
