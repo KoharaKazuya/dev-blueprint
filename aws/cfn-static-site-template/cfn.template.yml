@@ -1,0 +1,273 @@
+# このテンプレートファイルのフォーマットのバージョン
+#
+# ファイル更新日などではなく、フォーマットのバージョン番号のため変更してはならない
+AWSTemplateFormatVersion: '2010-09-09'
+
+# スタックの説明文
+#
+# CloudFormation スタックの一覧ページに表示されるため、なるべく伝わりやすい
+# 説明を記述したほうが良い
+Description: Stack for Static Web Site
+
+# パラメーター
+#
+# このテンプレートを使ってスタックを作成する際に入力させたい可変の値を記述する
+Parameters:
+  # プロジェクト名 (英数字 (小文字) とハイフンのみ)
+  #
+  # このスタックを利用するプロジェクトの名前
+  # リソースを識別するため、リソース名やコメントに用いる
+  ProjectName:
+    Type: String
+    Description: Project Name (only [0-9a-z-]*)
+    AllowedPattern: ^[0-9a-z-]*$
+
+  # DNS のルートドメイン名
+  #
+  # Route53 のホストゾーン名にあたる部分
+  # 例: www.example.com の example.com の部分
+  #
+  # URL のホスト名は <サブドメイン名>.<ルートドメイン名> として生成する
+  RootDomainName:
+    Type: String
+    Description: DNS Zone Apex Name (= Route53 Hosted Zone Name)
+
+  # DNS のサブドメイン名
+  #
+  # ドメイン名から Route53 のホストゾーン名にあたる部分を除いた部分
+  # 例: www.example.com の www の部分
+  #
+  # URL のホスト名は <サブドメイン名>.<ルートドメイン名> として生成する
+  SubDomainName:
+    Type: String
+    Description: DNS Sub Domain Name (NOT include Zone Apex Name)
+    Default: www
+
+  # 証明書 (ACM)
+  #
+  # RootDomainName および SubDomainName で指定した値から生成されるホスト名を含む
+  # 証明書でなければならない
+  #
+  # CloudFront で使用するため、バージニア北部に登録された ACM でなければならない
+  CertificateArn:
+    Type: String
+    Description: Certificate ARN (us-east-1 only)
+    AllowedPattern: ^arn:aws:acm:us-east-1:[0-9]*:certificate/[0-9a-z-]*$
+
+  # アプリケーションは SPA (Single Page Application) か
+  SPA:
+    Type: String
+    Description: Which is Application a Single Page Application
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+
+  # S3 バケットのログを記録するか
+  S3BucketLogging:
+    Type: String
+    Description: Logging S3 Bucket Access or not
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'True'
+
+  # CloudFront のログを記録するか
+  CloudFrontLogging:
+    Type: String
+    Description: Logging CloudFront Access or not
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'True'
+
+  # Web WAF ACL ID
+  #
+  # CloudFront に設定するアクセス制限の設定
+  # アクセス制限しない場合は空文字列を設定する
+  WebACLId:
+    Type: String
+    Description: AWS WAF ACL ID for CloudFront (specify empty string if you don't need)
+
+# リソースの設定値を可変にするための条件式
+Conditions:
+  SPA: !Equals [!Ref SPA, 'True']
+  S3BucketLogging: !Equals [!Ref S3BucketLogging, 'True']
+  CloudFrontLogging: !Equals [!Ref CloudFrontLogging, 'True']
+  LogBucketCreation: !Or
+    - Condition: S3BucketLogging
+    - Condition: CloudFrontLogging
+  WebACL: !Not [!Equals [!Ref WebACLId, '']]
+
+# スタック作成時に生成するリソース
+Resources:
+  # CloudFront のオリジンアクセスアイデンティティ
+  #
+  # CloudFront が S3 バケットに認証してもらうために必要となる
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Ref ProjectName
+
+  # S3 バケット (ログ)
+  #
+  # ログファイルの置き場所となる
+  S3BucketLog:
+    Type: AWS::S3::Bucket
+    Condition: LogBucketCreation
+    Properties:
+      BucketName: !Sub ${ProjectName}-log
+      # S3 バケット (アプリケーションデータ) からの S3 ログ配信を受けるために必要
+      AccessControl: LogDeliveryWrite
+      LifecycleConfiguration:
+        Rules:
+          # 一ヶ月で低頻度アクセスストレージに移行し、一年で削除する
+          # (期間は S3 バケット作成時のデフォルトに準拠)
+          - Id: sweep-stale-logs
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+            ExpirationInDays: 395
+
+  # S3 バケット (アプリケーションデータ)
+  #
+  # アプリケーションファイルの置き場所となる
+  S3BucketAppData:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-app-data
+      LoggingConfiguration: !If
+        - S3BucketLogging
+        - DestinationBucketName: !Ref S3BucketLog
+          LogFilePrefix: !Sub s3-bucket-${ProjectName}-app-data/
+        - !Ref AWS::NoValue
+
+  # S3 バケットポリシー (アプリケーションデータ)
+  #
+  # S3 バケットがどこからアクセス可能かを設定する
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3BucketAppData
+      PolicyDocument:
+        Statement:
+          # CloudFront からのログ書き込みを許可する
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+            Action: s3:GetObject
+            Resource: !Sub
+              - ${S3BucketArn}/*
+              - S3BucketArn: !GetAtt S3BucketAppData.Arn
+
+  # CloudFront
+  #
+  # オリジンサーバーやキャッシュ時間などの CDN 設定
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        # S3 バケット (アプリケーションデータ) をオリジンサーバーとする
+        Origins:
+          - DomainName: !GetAtt S3BucketAppData.DomainName
+            Id: S3BucketAppData
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
+        Enabled: true
+        Comment: !Ref ProjectName
+        DefaultRootObject: index.html
+        # SPA の場合、パスが存在しない全てのリクエストを /index.html で返す
+        # SPA でない場合、パスが存在しない全てのリクエストを /404.html で返す
+        #
+        # また、エラーレスポンスのキャッシュ時間はデフォルトを 300 秒から
+        # 短くするため、全てのエラーレスポンスの TTL を変更する
+        # @see https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html
+        # @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/custom-error-pages.html
+        CustomErrorResponses:
+          - ErrorCode: 400
+            ErrorCachingMinTTL: 30
+          - !If
+            - SPA
+            - ErrorCode: 403
+              ErrorCachingMinTTL: 30
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 403
+              ErrorCachingMinTTL: 30
+              ResponseCode: 404
+              ResponsePagePath: /404.html
+          - !If
+            - SPA
+            - ErrorCode: 404
+              ErrorCachingMinTTL: 30
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 404
+              ErrorCachingMinTTL: 30
+              ResponseCode: 404
+              ResponsePagePath: /404.html
+          - ErrorCode: 405
+            ErrorCachingMinTTL: 30
+          - ErrorCode: 416
+            ErrorCachingMinTTL: 30
+          - ErrorCode: 500
+            ErrorCachingMinTTL: 30
+          - ErrorCode: 501
+            ErrorCachingMinTTL: 30
+          - ErrorCode: 503
+            ErrorCachingMinTTL: 30
+        Aliases:
+          - !Sub ${SubDomainName}.${RootDomainName}
+        DefaultCacheBehavior:
+          TargetOriginId: S3BucketAppData
+          ForwardedValues:
+            QueryString: false
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+        PriceClass: PriceClass_200 # 東京を含む最も低コストなプラン
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+        IPV6Enabled: true
+        HttpVersion: http2
+        Logging: !If
+          - CloudFrontLogging
+          - Bucket: !GetAtt S3BucketLog.DomainName
+            Prefix: cloudfront-distribution/
+            IncludeCookies: false
+          - !Ref AWS::NoValue
+        WebACLId: !If
+          - WebACL
+          - !Ref WebACLId
+          - !Ref AWS::NoValue
+
+  # Route53 レコード
+  #
+  # DNS レコードの登録
+  # IPv6 の AAAA レコードのために RecordSetGroup を用いる
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !Sub ${RootDomainName}.
+      RecordSets:
+        - Name: !Sub ${SubDomainName}.${RootDomainName}.
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront 固定値
+        - Name: !Sub ${SubDomainName}.${RootDomainName}.
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront 固定値
+
+# 出力値
+#
+# このテンプレートを使ってスタックを作成した際に生成したリソースから取得できる値
+# コンソールで表示できる他、別のスタックの入力として参照できる
+Outputs:
+  URL:
+    Description: Application URL
+    Value: !Sub https://${SubDomainName}.${RootDomainName}/
