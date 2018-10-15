@@ -153,7 +153,7 @@ Resources:
       Bucket: !Ref S3BucketAppData
       PolicyDocument:
         Statement:
-          # CloudFront からのログ書き込みを許可する
+          # CloudFront からの読み込みを許可する
           - Effect: Allow
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
