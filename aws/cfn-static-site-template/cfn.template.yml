@@ -1,7 +1,7 @@
 # このテンプレートファイルのフォーマットのバージョン
 #
 # ファイル更新日などではなく、フォーマットのバージョン番号のため変更してはならない
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 
 # スタックの説明文
 #
@@ -13,40 +13,28 @@ Description: Stack for Static Web Site
 #
 # このテンプレートを使ってスタックを作成する際に入力させたい可変の値を記述する
 Parameters:
-  # プロジェクト名 (英数字 (小文字) とハイフンのみ)
+  # 既存の Route53 のホストゾーン名
   #
-  # このスタックを利用するプロジェクトの名前
-  # リソースを識別するため、リソース名やコメントに用いる
-  ProjectName:
+  # Web サイトのドメイン名は DomainName (別パラメーター) により指定するが、
+  # DomainName はこのパラメーターで指定するホストゾーンに含められる形でなければならない
+  HostedZone:
     Type: String
-    Description: Project Name (only [0-9a-z-]*)
-    AllowedPattern: ^[0-9a-z-]*$
+    Description: Route53 Hosted Zone Name
+    AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)
+    ConstraintDescription: must be a valid DNS zone name.
 
-  # DNS のルートドメイン名
+  # Web サイトのドメイン名
   #
-  # Route53 のホストゾーン名にあたる部分
-  # 例: www.example.com の example.com の部分
-  #
-  # URL のホスト名は <サブドメイン名>.<ルートドメイン名> として生成する
-  RootDomainName:
+  # HostedZone 以下に DNS レコードを登録するため、ホストゾーンに含められる形でなければならない
+  DomainName:
     Type: String
-    Description: DNS Zone Apex Name (= Route53 Hosted Zone Name)
-
-  # DNS のサブドメイン名
-  #
-  # ドメイン名から Route53 のホストゾーン名にあたる部分を除いた部分
-  # 例: www.example.com の www の部分
-  #
-  # URL のホスト名は <サブドメイン名>.<ルートドメイン名> として生成する
-  SubDomainName:
-    Type: String
-    Description: DNS Sub Domain Name (NOT include Zone Apex Name)
-    Default: www
+    Description: Domain Name
+    AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)
+    ConstraintDescription: must be a valid DNS zone name.
 
   # 証明書 (ACM)
   #
-  # RootDomainName および SubDomainName で指定した値から生成されるホスト名を含む
-  # 証明書でなければならない
+  # DomainName で指定した値を含む証明書でなければならない
   #
   # CloudFront で使用するため、バージニア北部に登録された ACM でなければならない
   CertificateArn:
@@ -59,27 +47,27 @@ Parameters:
     Type: String
     Description: Which is Application a Single Page Application
     AllowedValues:
-      - 'True'
-      - 'False'
-    Default: 'False'
+      - "True"
+      - "False"
+    Default: "False"
 
   # S3 バケットのログを記録するか
   S3BucketLogging:
     Type: String
     Description: Logging S3 Bucket Access or not
     AllowedValues:
-      - 'True'
-      - 'False'
-    Default: 'True'
+      - "True"
+      - "False"
+    Default: "True"
 
   # CloudFront のログを記録するか
   CloudFrontLogging:
     Type: String
     Description: Logging CloudFront Access or not
     AllowedValues:
-      - 'True'
-      - 'False'
-    Default: 'True'
+      - "True"
+      - "False"
+    Default: "True"
 
   # Web WAF ACL ID
   #
@@ -91,13 +79,13 @@ Parameters:
 
 # リソースの設定値を可変にするための条件式
 Conditions:
-  SPA: !Equals [!Ref SPA, 'True']
-  S3BucketLogging: !Equals [!Ref S3BucketLogging, 'True']
-  CloudFrontLogging: !Equals [!Ref CloudFrontLogging, 'True']
+  SPA: !Equals [!Ref SPA, "True"]
+  S3BucketLogging: !Equals [!Ref S3BucketLogging, "True"]
+  CloudFrontLogging: !Equals [!Ref CloudFrontLogging, "True"]
   LogBucketCreation: !Or
     - Condition: S3BucketLogging
     - Condition: CloudFrontLogging
-  WebACL: !Not [!Equals [!Ref WebACLId, '']]
+  WebACL: !Not [!Equals [!Ref WebACLId, ""]]
 
 # スタック作成時に生成するリソース
 Resources:
@@ -108,7 +96,7 @@ Resources:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Ref ProjectName
+        Comment: !Sub ${AWS::StackName}
 
   # S3 バケット (ログ)
   #
@@ -117,7 +105,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: LogBucketCreation
     Properties:
-      BucketName: !Sub ${ProjectName}-log
+      BucketName: !Sub ${AWS::StackName}-log
       # S3 バケット (アプリケーションデータ) からの S3 ログ配信を受けるために必要
       AccessControl: LogDeliveryWrite
       LifecycleConfiguration:
@@ -137,11 +125,12 @@ Resources:
   S3BucketAppData:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${ProjectName}-app-data
+      BucketName: !Sub ${AWS::StackName}-app-data
+      AccessControl: Private
       LoggingConfiguration: !If
         - S3BucketLogging
         - DestinationBucketName: !Ref S3BucketLog
-          LogFilePrefix: !Sub s3-bucket-${ProjectName}-app-data/
+          LogFilePrefix: !Sub s3-bucket-${AWS::StackName}-app-data/
         - !Ref AWS::NoValue
 
   # S3 バケットポリシー (アプリケーションデータ)
@@ -158,9 +147,7 @@ Resources:
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
             Action: s3:GetObject
-            Resource: !Sub
-              - ${S3BucketArn}/*
-              - S3BucketArn: !GetAtt S3BucketAppData.Arn
+            Resource: !Sub ${S3BucketAppData.Arn}/*
 
   # CloudFront
   #
@@ -171,12 +158,12 @@ Resources:
       DistributionConfig:
         # S3 バケット (アプリケーションデータ) をオリジンサーバーとする
         Origins:
-          - DomainName: !GetAtt S3BucketAppData.DomainName
+          - DomainName: !GetAtt S3BucketAppData.RegionalDomainName
             Id: S3BucketAppData
             S3OriginConfig:
               OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
         Enabled: true
-        Comment: !Ref ProjectName
+        Comment: !Sub ${AWS::StackName}
         DefaultRootObject: index.html
         # SPA の場合、パスが存在しない全てのリクエストを /index.html で返す
         # SPA でない場合、パスが存在しない全てのリクエストを /404.html で返す
@@ -219,14 +206,13 @@ Resources:
           - ErrorCode: 503
             ErrorCachingMinTTL: 30
         Aliases:
-          - !Sub ${SubDomainName}.${RootDomainName}
+          - !Ref DomainName
         DefaultCacheBehavior:
           TargetOriginId: S3BucketAppData
-          ForwardedValues:
-            QueryString: false
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # Managed-CORS-S3Origin
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
-        PriceClass: PriceClass_200 # 東京を含む最も低コストなプラン
         ViewerCertificate:
           AcmCertificateArn: !Ref CertificateArn
           SslSupportMethod: sni-only
@@ -250,14 +236,14 @@ Resources:
   Route53RecordSetGroup:
     Type: AWS::Route53::RecordSetGroup
     Properties:
-      HostedZoneName: !Sub ${RootDomainName}.
+      HostedZoneName: !Sub ${HostedZone}.
       RecordSets:
-        - Name: !Sub ${SubDomainName}.${RootDomainName}.
+        - Name: !Sub ${DomainName}.
           Type: A
           AliasTarget:
             DNSName: !GetAtt CloudFrontDistribution.DomainName
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront 固定値
-        - Name: !Sub ${SubDomainName}.${RootDomainName}.
+        - Name: !Sub ${DomainName}.
           Type: AAAA
           AliasTarget:
             DNSName: !GetAtt CloudFrontDistribution.DomainName
@@ -270,4 +256,4 @@ Resources:
 Outputs:
   URL:
     Description: Application URL
-    Value: !Sub https://${SubDomainName}.${RootDomainName}/
+    Value: !Sub https://${DomainName}/
