@@ -146,8 +146,12 @@ Resources:
           - Effect: Allow
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
-            Action: s3:GetObject
-            Resource: !Sub ${S3BucketAppData.Arn}/*
+            Action:
+              - s3:ListBucket
+              - s3:GetObject
+            Resource:
+              - !Sub ${S3BucketAppData.Arn}
+              - !Sub ${S3BucketAppData.Arn}/*
 
   # CloudFront
   #
@@ -175,16 +179,8 @@ Resources:
         CustomErrorResponses:
           - ErrorCode: 400
             ErrorCachingMinTTL: 30
-          - !If
-            - SPA
-            - ErrorCode: 403
-              ErrorCachingMinTTL: 30
-              ResponseCode: 200
-              ResponsePagePath: /index.html
-            - ErrorCode: 403
-              ErrorCachingMinTTL: 30
-              ResponseCode: 404
-              ResponsePagePath: /404.html
+          - ErrorCode: 403
+            ErrorCachingMinTTL: 30
           - !If
             - SPA
             - ErrorCode: 404
