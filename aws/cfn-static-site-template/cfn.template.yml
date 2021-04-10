@@ -126,7 +126,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub ${AWS::StackName}-app-data
-      AccessControl: Private
       LoggingConfiguration: !If
         - S3BucketLogging
         - DestinationBucketName: !Ref S3BucketLog
